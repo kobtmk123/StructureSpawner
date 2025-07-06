@@ -90,7 +90,6 @@ public final class StructureSpawner extends JavaPlugin {
             PasteRequest request = pasteQueue.poll();
             if (request != null) {
                 // Nếu có yêu cầu, tiến hành dán công trình
-                getLogger().info("Đang xử lý một yêu cầu spawn từ hàng đợi...");
                 pasteSchematic(request);
             }
         }, 40L, 40L);
@@ -144,5 +143,14 @@ public final class StructureSpawner extends JavaPlugin {
     public String getTranslatedMessage(String path) {
         String message = getConfig().getString(path, "Message not found: " + path);
         return ChatColor.translateAlternateColorCodes('&', message);
+    }
+    
+    /**
+     * Trả về hàng đợi chứa các yêu cầu dán công trình.
+     * Cần thiết để các lớp khác có thể kiểm tra các yêu cầu đang chờ xử lý.
+     * @return Hàng đợi các yêu cầu dán.
+     */
+    public Queue<PasteRequest> getPasteQueue() {
+        return this.pasteQueue;
     }
 }

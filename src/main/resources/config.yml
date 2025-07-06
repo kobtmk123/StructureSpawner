@@ -12,6 +12,10 @@ ti-le-spawn: 1.5
 # -1: Công trình sẽ bị lún xuống đất 1 block.
 do-cao-so-voi-mat-dat: 1
 
+# Khoảng cách tối thiểu (tính bằng block) giữa các công trình được spawn.
+# Điều này ngăn các công trình xuất hiện quá gần nhau.
+khoang-cach-toi-thieu: 150
+
 # Các tin nhắn của plugin. Bạn có thể sử dụng mã màu với ký tự '&'.
 messages:
   prefix: "&e[Công Trình] &r"

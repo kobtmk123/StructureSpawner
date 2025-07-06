@@ -8,6 +8,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.world.ChunkLoadEvent;
 
 import java.io.File;
+import java.util.Queue;
 import java.util.Random;
 
 public class ChunkLoadListener implements Listener {
@@ -21,6 +22,7 @@ public class ChunkLoadListener implements Listener {
 
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
+        // --- BƯỚC 1: CÁC ĐIỀU KIỆN CƠ BẢN ---
         // Chỉ xử lý khi chunk này là chunk mới được tạo ra
         if (!event.isNewChunk()) {
             return;
@@ -32,6 +34,7 @@ public class ChunkLoadListener implements Listener {
             return;
         }
 
+        // --- BƯỚC 2: CHUẨN BỊ DỮ LIỆU ---
         // Lấy danh sách các file schematic
         File schematicsDir = new File(plugin.getDataFolder(), "schematics");
         File[] schematicFiles = schematicsDir.listFiles((dir, name) -> name.endsWith(".schem") || name.endsWith(".schematic"));
@@ -41,29 +44,46 @@ public class ChunkLoadListener implements Listener {
             return;
         }
 
-        // Chọn một công trình ngẫu nhiên từ danh sách
+        // Chọn một công trình ngẫu nhiên từ danh sách và lấy thông tin thế giới
         File schematicFile = schematicFiles[random.nextInt(schematicFiles.length)];
         World world = event.getWorld();
 
-        // --- TÍNH TOÁN VỊ TRÍ ĐỂ SPAWN ---
-        // Lấy tọa độ trung tâm của chunk
+        // --- BƯỚC 3: TÍNH TOÁN VỊ TRÍ DỰ KIẾN ---
         int x = event.getChunk().getX() * 16 + 8;
         int z = event.getChunk().getZ() * 16 + 8;
-        
-        // Tìm tọa độ Y cao nhất trên mặt đất (không tính cây, cỏ,...)
         int y = world.getHighestBlockYAt(x, z, HeightMap.WORLD_SURFACE);
-        
-        // Lấy độ cao tùy chỉnh từ config
         int yOffset = plugin.getConfig().getInt("do-cao-so-voi-mat-dat", 1);
-        
-        // Tạo vector vị trí cuối cùng
-        BlockVector3 pasteLocation = BlockVector3.at(x, y + yOffset, z);
+        BlockVector3 newLocation = BlockVector3.at(x, y + yOffset, z);
 
-        // --- BƯỚC QUAN TRỌNG NHẤT ---
-        // Tạo một yêu cầu spawn mới
-        PasteRequest request = new PasteRequest(schematicFile, world, pasteLocation);
+        // --- BƯỚC 4: KIỂM TRA KHOẢNG CÁCH (LOGIC QUAN TRỌNG NHẤT) ---
+        int minDistance = plugin.getConfig().getInt("khoang-cach-toi-thieu", 150);
+        // Tính bình phương khoảng cách để so sánh. Việc này hiệu quả hơn nhiều so với
+        // việc tính căn bậc hai (distance), giúp tiết kiệm tài nguyên server.
+        double minDistanceSquared = Math.pow(minDistance, 2);
+
+        // Lấy hàng đợi các công trình đang chờ xử lý từ class chính
+        Queue<PasteRequest> existingRequests = plugin.getPasteQueue();
+
+        // Lặp qua tất cả các yêu cầu đang có trong hàng đợi
+        for (PasteRequest existingRequest : existingRequests) {
+            // Chỉ kiểm tra khoảng cách với các công trình trong cùng một thế giới
+            if (existingRequest.getWorld().equals(world)) {
+                // Tính bình phương khoảng cách giữa vị trí mới và vị trí đang chờ
+                double distanceSquared = existingRequest.getPasteLocation().distanceSq(newLocation);
+                
+                // Nếu khoảng cách nhỏ hơn mức tối thiểu, hủy bỏ việc spawn và thoát khỏi hàm
+                if (distanceSquared < minDistanceSquared) {
+                    return; // Hủy bỏ vì quá gần
+                }
+            }
+        }
+
+        // --- BƯỚC 5: THÊM YÊU CẦU VÀO HÀNG ĐỢI ---
+        // Nếu tất cả các kiểm tra đều vượt qua, tạo một yêu cầu mới
+        PasteRequest request = new PasteRequest(schematicFile, world, newLocation);
         
-        // Thêm yêu cầu này vào hàng đợi của plugin chính để xử lý sau
+        // Thêm yêu cầu vào hàng đợi của plugin để xử lý sau
         plugin.addPasteRequest(request);
+        plugin.getLogger().info("Yêu cầu spawn tại " + newLocation.toString() + " đã hợp lệ và được thêm vào hàng đợi.");
     }
 }
