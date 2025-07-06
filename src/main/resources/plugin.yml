@@ -1,24 +1,19 @@
-# Cấu hình cho plugin StructureSpawner
-# By Been vĩ đại!
+name: StructureSpawner
+version: '1.0-SNAPSHOT'
+main: com.yourdomain.structurespawner.StructureSpawner
+api-version: '1.21'
+author: Been # Hoặc tên của bạn
+description: Tự động spawn các công trình từ file .schem trong các chunk mới.
+depend: [WorldEdit]
 
-# Tỉ lệ % một công trình sẽ được spawn trong một chunk mới được tạo ra.
-# Ví dụ: 1.5 có nghĩa là 1.5% cơ hội.
-# Đặt là 0 để tắt spawn.
-ti-le-spawn: 1.5
+commands:
+  structurespawner:
+    description: Lệnh chính của plugin StructureSpawner.
+    aliases: [ss, congtrinh]
+    permission: structurespawner.admin
+    usage: "/<command> [reload|list]"
 
-# Độ cao của công trình so với mặt đất.
-# 0: Công trình sẽ được đặt ngay trên mặt đất.
-# 1: Công trình sẽ được đặt cao hơn mặt đất 1 block.
-# -1: Công trình sẽ bị lún xuống đất 1 block.
-do-cao-so-voi-mat-dat: 1
-
-# Các tin nhắn của plugin. Bạn có thể sử dụng mã màu với ký tự '&'.
-messages:
-  prefix: "&e[Công Trình] &r"
-  reload-success: "&aĐã tải lại cấu hình thành công!"
-  no-permission: "&cBạn không có quyền để thực hiện lệnh này."
-  player-only: "&cChỉ người chơi mới có thể dùng lệnh này."
-  list-header: "&6--- Danh sách các công trình có thể spawn ---"
-  list-item: "&e- &f{file_name}"
-  list-empty: "&cKhông tìm thấy file công trình (.schem) nào trong thư mục 'schematics'."
-  worldedit-not-found: "&cPlugin WorldEdit không được tìm thấy! Plugin StructureSpawner sẽ bị vô hiệu hóa."
+permissions:
+  structurespawner.admin:
+    description: Cho phép sử dụng tất cả các lệnh của StructureSpawner.
+    default: op
