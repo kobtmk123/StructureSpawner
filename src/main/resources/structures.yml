@@ -1,0 +1,59 @@
+# ===================================================================
+#           CẤU HÌNH CHI TIẾT CHO CÁC CÔNG TRÌNH
+# ===================================================================
+#
+# File này sẽ tự động cập nhật khi bạn thêm file .schem/.schematic
+# mới vào thư mục 'schematics' và khởi động lại server hoặc dùng
+# lệnh /ss reload.
+#
+# -------------------------------------------------------------------
+# Hướng dẫn sử dụng các tùy chọn:
+# -------------------------------------------------------------------
+#
+# enabled:
+#   - Đặt là 'true' để cho phép công trình này được spawn.
+#   - Đặt là 'false' để tạm thời vô hiệu hóa công trình này mà không
+#     cần xóa file schematic.
+#
+# spawn-type:
+#   - Loại địa hình mà công trình sẽ được spawn trên đó.
+#   - Các giá trị hợp lệ bao gồm:
+#
+#     LAND: Spawn trên mặt đất liền. Plugin sẽ tự động tránh các
+#           biome biển hoặc các vùng nước lớn.
+#
+#     SEA_SURFACE: (Mới) Spawn nổi trên MẶT NƯỚC của các biome biển.
+#                  Lý tưởng cho các công trình như tàu, thuyền,
+#                  giàn khoan, hoặc các hòn đảo nhỏ.
+#
+#     SEA_FLOOR: (Mới) Spawn dưới ĐÁY BIỂN của các biome biển.
+#                Lý tưởng cho các tàn tích, thành phố chìm,
+#                hoặc các công trình dưới nước.
+#
+#     AIR: Spawn lơ lửng trên trời. Cần thiết lập 'y-coordinate'.
+#
+# y-coordinate:
+#   - (Chỉ sử dụng khi spawn-type là AIR)
+#   - Thiết lập tọa độ Y cố định để công trình được spawn.
+#
+# -------------------------------------------------------------------
+# VÍ DỤ:
+# -------------------------------------------------------------------
+# structures:
+#   'castle.schem':
+#     enabled: true
+#     spawn-type: LAND
+#   'pirate_ship.schem':
+#     enabled: true
+#     spawn-type: SEA_SURFACE
+#   'atlantis.schem':
+#     enabled: true
+#     spawn-type: SEA_FLOOR
+#   'flying_island.schem':
+#     enabled: true
+#     spawn-type: AIR
+#     y-coordinate: 180
+# -------------------------------------------------------------------
+
+structures: {}
+# Các công trình của bạn sẽ được tự động thêm vào đây.

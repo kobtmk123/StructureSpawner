@@ -3,18 +3,30 @@ package com.yourdomain.structurespawner;
 import com.sk89q.worldedit.math.BlockVector3;
 import org.bukkit.HeightMap;
 import org.bukkit.World;
+import org.bukkit.block.Biome;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.ChunkLoadEvent;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Queue;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 public class ChunkLoadListener implements Listener {
 
     private final StructureSpawner plugin;
     private final Random random = new Random();
+    
+    // Danh sách các biome được coi là biển để kiểm tra
+    private static final List<Biome> OCEAN_BIOMES = Arrays.asList(
+            Biome.OCEAN, Biome.COLD_OCEAN, Biome.DEEP_COLD_OCEAN,
+            Biome.DEEP_FROZEN_OCEAN, Biome.DEEP_LUKEWARM_OCEAN, Biome.DEEP_OCEAN,
+            Biome.FROZEN_OCEAN, Biome.LUKEWARM_OCEAN, Biome.WARM_OCEAN
+    );
 
     public ChunkLoadListener(StructureSpawner plugin) {
         this.plugin = plugin;
@@ -22,68 +34,93 @@ public class ChunkLoadListener implements Listener {
 
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
-        // --- BƯỚC 1: CÁC ĐIỀU KIỆN CƠ BẢN ---
-        // Chỉ xử lý khi chunk này là chunk mới được tạo ra
-        if (!event.isNewChunk()) {
-            return;
-        }
+        if (!event.isNewChunk()) return;
 
-        // Lấy tỉ lệ spawn từ config và thực hiện "quay số"
         double spawnChance = plugin.getConfig().getDouble("ti-le-spawn", 0);
-        if (spawnChance <= 0 || (random.nextDouble() * 100 > spawnChance)) {
-            return;
-        }
+        if (spawnChance <= 0 || (random.nextDouble() * 100 > spawnChance)) return;
 
-        // --- BƯỚC 2: CHUẨN BỊ DỮ LIỆU ---
-        // Lấy danh sách các file schematic
+        FileConfiguration structuresConfig = plugin.getStructuresConfig();
         File schematicsDir = new File(plugin.getDataFolder(), "schematics");
-        File[] schematicFiles = schematicsDir.listFiles((dir, name) -> name.endsWith(".schem") || name.endsWith(".schematic"));
 
-        // Nếu không có file schematic nào thì dừng lại
-        if (schematicFiles == null || schematicFiles.length == 0) {
-            return;
-        }
+        // Lọc danh sách các schematic có thể spawn (enabled = true)
+        List<File> availableSchematics = Arrays.stream(schematicsDir.listFiles((dir, name) -> name.endsWith(".schem") || name.endsWith(".schematic")))
+                .filter(file -> structuresConfig.getBoolean("structures." + file.getName() + ".enabled", false))
+                .collect(Collectors.toList());
 
-        // Chọn một công trình ngẫu nhiên từ danh sách và lấy thông tin thế giới
-        File schematicFile = schematicFiles[random.nextInt(schematicFiles.length)];
+        if (availableSchematics.isEmpty()) return;
+
+        File schematicFile = availableSchematics.get(random.nextInt(availableSchematics.size()));
         World world = event.getWorld();
+        String configPath = "structures." + schematicFile.getName();
 
-        // --- BƯỚC 3: TÍNH TOÁN VỊ TRÍ DỰ KIẾN ---
+        // Lấy thông tin từ structures.yml
+        String spawnType = structuresConfig.getString(configPath + ".spawn-type", "LAND").toUpperCase();
+
         int x = event.getChunk().getX() * 16 + 8;
         int z = event.getChunk().getZ() * 16 + 8;
-        int y = world.getHighestBlockYAt(x, z, HeightMap.WORLD_SURFACE);
+        int y;
+        
+        // Dựa vào spawn-type để quyết định cách tính tọa độ Y và kiểm tra điều kiện
+        switch (spawnType) {
+            case "LAND":
+                Biome biome = world.getBiome(x, 0, z);
+                if (OCEAN_BIOMES.contains(biome) || world.getHighestBlockAt(x, z).isLiquid()) {
+                    return; // Nếu là biển hoặc trên mặt nước, hủy spawn
+                }
+                // Lấy Y của mặt đất liền
+                y = world.getHighestBlockYAt(x, z, HeightMap.WORLD_SURFACE);
+                break;
+                
+            case "SEA_SURFACE":
+                // Đảm bảo chỉ spawn ở biome biển
+                if (!OCEAN_BIOMES.contains(world.getBiome(x, 0, z))) {
+                    return; // Nếu không phải biome biển, hủy spawn
+                }
+                // Dùng MOTION_BLOCKING để lấy tọa độ Y của mặt nước (điểm cao nhất mà vật thể có thể va chạm)
+                y = world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING);
+                break;
+                
+            case "SEA_FLOOR":
+                // Đảm bảo chỉ spawn ở biome biển
+                if (!OCEAN_BIOMES.contains(world.getBiome(x, 0, z))) {
+                    return; // Nếu không phải biome biển, hủy spawn
+                }
+                // Dùng OCEAN_FLOOR_WG để lấy tọa độ Y của đáy biển
+                y = world.getHighestBlockYAt(x, z, HeightMap.OCEAN_FLOOR_WG);
+                break;
+            
+            case "AIR":
+                // Lấy tọa độ Y cố định từ file config
+                y = structuresConfig.getInt(configPath + ".y-coordinate", 150);
+                break;
+
+            case "SEA": // Trường hợp dự phòng nếu admin dùng cấu hình cũ 'SEA'
+                plugin.getLogger().warning("Loại spawn 'SEA' đã lỗi thời cho công trình '" + schematicFile.getName() + "'. Vui lòng đổi thành 'SEA_SURFACE' hoặc 'SEA_FLOOR' trong structures.yml.");
+                return;
+
+            default:
+                plugin.getLogger().warning("Loại spawn không hợp lệ '" + spawnType + "' cho file " + schematicFile.getName() + ". Vui lòng kiểm tra file structures.yml.");
+                return;
+        }
+
+        // Áp dụng độ cao tùy chỉnh (ví dụ: đặt công trình cao hơn mặt nước 1 block)
         int yOffset = plugin.getConfig().getInt("do-cao-so-voi-mat-dat", 1);
         BlockVector3 newLocation = BlockVector3.at(x, y + yOffset, z);
 
-        // --- BƯỚC 4: KIỂM TRA KHOẢNG CÁCH (LOGIC QUAN TRỌNG NHẤT) ---
+        // Kiểm tra khoảng cách tối thiểu với các công trình khác
         int minDistance = plugin.getConfig().getInt("khoang-cach-toi-thieu", 150);
-        // Tính bình phương khoảng cách để so sánh. Việc này hiệu quả hơn nhiều so với
-        // việc tính căn bậc hai (distance), giúp tiết kiệm tài nguyên server.
         double minDistanceSquared = Math.pow(minDistance, 2);
-
-        // Lấy hàng đợi các công trình đang chờ xử lý từ class chính
         Queue<PasteRequest> existingRequests = plugin.getPasteQueue();
-
-        // Lặp qua tất cả các yêu cầu đang có trong hàng đợi
+        
         for (PasteRequest existingRequest : existingRequests) {
-            // Chỉ kiểm tra khoảng cách với các công trình trong cùng một thế giới
-            if (existingRequest.getWorld().equals(world)) {
-                // Tính bình phương khoảng cách giữa vị trí mới và vị trí đang chờ
-                double distanceSquared = existingRequest.getPasteLocation().distanceSq(newLocation);
-                
-                // Nếu khoảng cách nhỏ hơn mức tối thiểu, hủy bỏ việc spawn và thoát khỏi hàm
-                if (distanceSquared < minDistanceSquared) {
-                    return; // Hủy bỏ vì quá gần
-                }
+            if (existingRequest.getWorld().equals(world) && existingRequest.getPasteLocation().distanceSq(newLocation) < minDistanceSquared) {
+                return; // Quá gần, hủy spawn
             }
         }
-
-        // --- BƯỚC 5: THÊM YÊU CẦU VÀO HÀNG ĐỢI ---
-        // Nếu tất cả các kiểm tra đều vượt qua, tạo một yêu cầu mới
-        PasteRequest request = new PasteRequest(schematicFile, world, newLocation);
         
-        // Thêm yêu cầu vào hàng đợi của plugin để xử lý sau
+        // Thêm vào hàng đợi nếu mọi thứ hợp lệ
+        PasteRequest request = new PasteRequest(schematicFile, world, newLocation);
         plugin.addPasteRequest(request);
-        plugin.getLogger().info("Yêu cầu spawn tại " + newLocation.toString() + " đã hợp lệ và được thêm vào hàng đợi.");
+        plugin.getLogger().info("Yêu cầu spawn (" + spawnType + ") cho '" + schematicFile.getName() + "' đã hợp lệ và được thêm vào hàng đợi.");
     }
 }
